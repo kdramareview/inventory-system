@@ -2,131 +2,380 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Inventory System</title>
+  <title>Inventory & Billing System</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    h2 { margin-top: 30px; }
-    input, button { margin: 5px; padding: 5px; }
+    .section { border: 1px solid #ccc; padding: 20px; margin-bottom: 30px; border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    .section { border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-bottom: 30px; }
+    input, select, button { margin: 5px; padding: 5px; }
+    .actions button { margin: 0 2px; }
   </style>
 </head>
 <body>
 
-  <!-- Add Inventory -->
+<!-- Section 1: Add Inventory -->
+<div class="section">
+  <h2>1. Add Inventory</h2>
+  <label>Select Item:
+    <select id="inv-select" onchange="handleInvSelect()"></select>
+    <button onclick="refreshIDs()">↻</button>
+  </label><br>
+  <label>ID: <input type="text" id="inv-id" readonly></label>
+  <label>Item: <input type="text" id="inv-item"></label>
+  <label>Qty: <input type="number" id="inv-qty"></label>
+  <label>Price: <input type="number" id="inv-price" step="0.01"></label>
+  <button onclick="addInventory()">➕ Add</button>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Item</th><th>Qty</th><th>Price</th><th>Action</th></tr>
+    </thead>
+    <tbody id="inv-table-body"></tbody>
+  </table>
+  <button onclick="submitInventoryTable()">✅ Submit Inventory</button>
+</div>
+
+<div class="section">
+
   <div class="section">
-    <h2>1. Add Inventory</h2>
-    <label>ID: <input type="text" id="inv-id"></label>
-    <label>Item: <input type="text" id="inv-item"></label>
-    <label>Quantity: <input type="number" id="inv-qty"></label>
-    <label>Price: <input type="number" id="inv-price" step="0.01"></label>
-    <button onclick="addInventory()">Add</button>
-  </div>
+  <h2>2. Create Bill</h2>
+  <label>Bill No: <input type="text" id="bill-number" readonly></label>
+  <label>Customer Name: <input type="text" id="customer-name"></label>
+  <label>Phone: <input type="tel" id="customer-phone" placeholder="+91..."></label><br>
 
-  <!-- Make Bill -->
-  <div class="section">
-    <h2>2. Make Bill</h2>
-    <label>ID: <input type="text" id="bill-id"></label>
-    <label>Quantity: <input type="number" id="bill-qty"></label>
-    <button onclick="makeBill()">Generate Bill</button>
-    <div id="bill-output"></div>
-  </div>
+  <label>Select Item:
+    <select id="bill-select" onchange="handleBillSelect()"></select>
+    <button onclick="refreshIDs()">↻</button>
+  </label>
+  <label>ID: <input type="text" id="bill-id" readonly></label>
+  <label>Qty: <input type="number" id="bill-qty"></label>
+  <button onclick="makeBill()">➕ Add to Bill</button>
 
-  <!-- Display Stock -->
-  <div class="section">
-    <h2>3. Display Stock</h2>
-    <button onclick="displayStock()">Show Stock</button>
-    <table id="stock-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Item</th>
-          <th>Quantity</th>
-          <th>Price</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th>Action</th></tr>
+    </thead>
+    <tbody id="bill-table-body"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" style="text-align:right;"><strong>Grand Total:</strong></td>
+        <td colspan="2" id="grand-total">₹0.00</td>
+      </tr>
+    </tfoot>
+  </table>
 
-  <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbwsKdh2lT6QNg8yZ6K4YzRi7L5W0yN7YdJwHzX-HsuT1NisDjZQbXuJFlqDKibZrqJA/exec"; // Replace with your deployed Apps Script URL
+  <button onclick="submitBillTable()">✅ Submit Bill</button>
+  <button onclick="exportBill()">🖨️ Print / Export</button>
+  <button onclick="shareOnWhatsApp()">📤 Share on WhatsApp</button>
+</div>
 
-    async function addInventory() {
-      const id = document.getElementById('inv-id').value.trim();
-      const item = document.getElementById('inv-item').value.trim();
-      const qty = document.getElementById('inv-qty').value;
-      const price = document.getElementById('inv-price').value;
 
-      if (!id || !item || !qty || !price) {
-        alert("All fields are required.");
-        return;
-      }
+<!-- Section 3: Display Stock -->
+<div class="section">
+  <h2>3. Display Stock</h2>
+  <button onclick="displayStock()">🔄 Refresh Stock</button>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Item</th><th>Quantity</th><th>Price</th></tr>
+    </thead>
+    <tbody id="stock-table-body"></tbody>
+  </table>
+</div>
 
-      const params = new URLSearchParams({
-        action: "addInventory",
-        id, item, quantity: qty, price
-      });
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbxpXwfgF2f5a1cdgP98o7Pgx8wwHntttMwOGMtIyXfuGKMTuMcWpOTJVK3VrS9aES47/exec"; // Replace with your deployed Apps Script Web App URL
+// https://script.google.com/macros/s/AKfycbxpXwfgF2f5a1cdgP98o7Pgx8wwHntttMwOGMtIyXfuGKMTuMcWpOTJVK3VrS9aES47/exec
+let inventoryTableData = [];
+let billTableData = [];
+let stockData = [];
 
-      await fetch(API_URL, {
-        method: "POST",
-        body: params
-      });
+async function refreshIDs() {
+  const res = await fetch(API_URL + "?action=getInventoryIDs");
+  const data = await res.json();
 
-      alert("Added to Inventory!");
-    }
+  const invSelect = document.getElementById("inv-select");
+  invSelect.innerHTML = '';
+  const billSelect = document.getElementById("bill-select");
+  billSelect.innerHTML = '';
 
-    async function makeBill() {
-      const id = document.getElementById('bill-id').value.trim();
-      const qty = document.getElementById('bill-qty').value;
+  data.forEach(entry => {
+    const label = `${entry.id} - ${entry.item}`;
+    const value = JSON.stringify(entry);
+    invSelect.add(new Option(label, value));
+    billSelect.add(new Option(label, value));
+  });
 
-      const params = new URLSearchParams({
-        action: "makeBill",
-        id, quantity: qty
-      });
+  invSelect.add(new Option("➕ New Item...", "new"));
+  // billSelect.add(new Option("➕ New Item...", "new"));
 
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: params
-      });
+  await generateBillNumber();
+}
 
-      const text = await res.text();
+function handleInvSelect() {
+  const value = document.getElementById("inv-select").value;
+  if (value === "new") {
+    document.getElementById("inv-id").value = '';
+    document.getElementById("inv-item").value = '';
+    document.getElementById("inv-id").readOnly = false;
+    document.getElementById("inv-item").readOnly = false;
+    return;
+  }
+  const { id, item } = JSON.parse(value);
+  document.getElementById("inv-id").value = id;
+  document.getElementById("inv-item").value = item;
+  document.getElementById("inv-id").readOnly = true;
+  document.getElementById("inv-item").readOnly = true;
+}
 
-      try {
-        const data = JSON.parse(text);
-        document.getElementById('bill-output').innerHTML = `
-          <h3>Bill</h3>
-          <table>
-            <tr><th>ID</th><td>${data.id}</td></tr>
-            <tr><th>Item</th><td>${data.item}</td></tr>
-            <tr><th>Quantity</th><td>${data.quantity}</td></tr>
-            <tr><th>Price</th><td>${data.price}</td></tr>
-            <tr><th>Total</th><td><strong>${data.total.toFixed(2)}</strong></td></tr>
-          </table>`;
-      } catch (e) {
-        document.getElementById('bill-output').innerHTML = `<p style="color:red;">${text}</p>`;
-      }
-    }
+function handleBillSelect() {
+  const value = document.getElementById("bill-select").value;
+  if (!value) return;
+  try {
+    const obj = JSON.parse(value);
+    document.getElementById("bill-id").value = obj.id;
+  } catch {}
+}
 
-    async function displayStock() {
-      const res = await fetch(API_URL + "?action=getStock");
-      const stock = await res.json();
+function addInventory() {
+  const id = document.getElementById("inv-id").value.trim();
+  const item = document.getElementById("inv-item").value.trim();
+  const qty = document.getElementById("inv-qty").value;
+  const price = document.getElementById("inv-price").value;
+  if (!id || !item || !qty || !price) return alert("All fields are required.");
+  inventoryTableData.push({ id, item, quantity: qty, price });
+  renderInventoryTable();
+  document.getElementById("inv-qty").value = '';
+  document.getElementById("inv-price").value = '';
+}
 
-      const tbody = document.querySelector("#stock-table tbody");
-      tbody.innerHTML = "";
+function renderInventoryTable() {
+  const tbody = document.getElementById("inv-table-body");
+  tbody.innerHTML = '';
+  inventoryTableData.forEach((row, i) => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.id}</td>
+        <td>${row.item}</td>
+        <td>${row.quantity}</td>
+        <td>${row.price}</td>
+        <td class="actions">
+          <button onclick="editInventory(${i})">✏️</button>
+          <button onclick="deleteInventory(${i})">🗑️</button>
+        </td>
+      </tr>`;
+  });
+}
 
-      stock.forEach(item => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${item.id}</td>
-            <td>${item.item}</td>
-            <td>${item.quantity}</td>
-            <td>${item.price}</td>
-          </tr>`;
-      });
-    }
-  </script>
+function deleteInventory(index) {
+  inventoryTableData.splice(index, 1);
+  renderInventoryTable();
+}
 
+function editInventory(index) {
+  const row = inventoryTableData[index];
+  document.getElementById("inv-id").value = row.id;
+  document.getElementById("inv-item").value = row.item;
+  document.getElementById("inv-qty").value = row.quantity;
+  document.getElementById("inv-price").value = row.price;
+  document.getElementById("inv-id").readOnly = true;
+  document.getElementById("inv-item").readOnly = true;
+  deleteInventory(index);
+}
+
+async function submitInventoryTable() {
+  if (inventoryTableData.length === 0) return alert("No inventory to submit.");
+  await fetch(API_URL, {
+    method: "POST",
+    body: new URLSearchParams({
+      action: "submitInventory",
+      data: JSON.stringify(inventoryTableData)
+    })
+  });
+  alert("Inventory submitted!");
+  inventoryTableData = [];
+  renderInventoryTable();
+  refreshIDs();
+}
+
+
+function makeBill() {
+  const id = document.getElementById("bill-id").value.trim();
+  const qty = parseFloat(document.getElementById("bill-qty").value);
+  if (!id || isNaN(qty)) return alert("Select item and quantity.");
+
+  const selectedOption = document.getElementById("bill-select").value;
+  let item = "", price = 0;
+
+  try {
+    const selected = JSON.parse(selectedOption);
+    item = selected.item;
+
+    const stockItem = stockData.find(s => s.id === selected.id);
+    if (!stockItem || isNaN(parseFloat(stockItem.price))) throw new Error("Price not found");
+
+    price = parseFloat(stockItem.price);
+  } catch (err) {
+    return alert("Could not get item price. Please refresh stock.");
+  }
+
+  const total = qty * price;
+
+  billTableData.push({ id, item, quantity: qty, price, total });
+  renderBillTable();
+  document.getElementById("bill-qty").value = '';
+}
+
+function renderBillTable() {
+  const tbody = document.getElementById("bill-table-body");
+  const grandTotal = document.getElementById("grand-total");
+  tbody.innerHTML = '';
+  let totalSum = 0;
+  billTableData.forEach((row, i) => {
+    totalSum += row.total;
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.id}</td>
+        <td>${row.item}</td>
+        <td>${row.quantity}</td>
+        <td>${row.price}</td>
+        <td>${row.total.toFixed(2)}</td>
+        <td>
+          <button onclick="editBill(${i})">✏️</button>
+          <button onclick="deleteBill(${i})">🗑️</button>
+        </td>
+      </tr>`;
+  });
+  grandTotal.innerText = `₹${totalSum.toFixed(2)}`;
+}
+
+function deleteBill(index) {
+  billTableData.splice(index, 1);
+  renderBillTable();
+}
+
+function editBill(index) {
+  const row = billTableData[index];
+  document.getElementById("bill-id").value = row.id;
+  document.getElementById("bill-qty").value = row.quantity;
+  deleteBill(index);
+}
+
+async function submitBillTable() {
+  if (billTableData.length === 0) return alert("No items in bill.");
+  const customer = document.getElementById("customer-name").value.trim();
+  const phone = document.getElementById("customer-phone").value.trim();
+  const billNo = document.getElementById("bill-number").value;
+
+  if (!customer || !phone) return alert("Customer and phone required.");
+
+  const enriched = billTableData.map(row => ({
+    id: row.id,
+    item: row.item,
+    quantity: row.quantity,
+    price: row.price,
+    total: row.total,
+    billNo,
+    customer,
+    phone
+  }));
+
+  await fetch(API_URL, {
+    method: "POST",
+    body: new URLSearchParams({
+      action: "submitBill",
+      data: JSON.stringify(enriched)
+    })
+  });
+
+ alert("Bill submitted!");
+  billTableData = [];
+  renderBillTable();
+  document.getElementById("customer-name").value = '';
+  document.getElementById("customer-phone").value = '';
+  generateBillNumber();
+}
+
+
+async function generateBillNumber() {
+  try {
+    const res = await fetch(API_URL + "?action=generateBillNo");
+    const billNo = await res.text();
+    if (!billNo.startsWith("BILL-")) throw new Error("Invalid bill no");
+    document.getElementById("bill-number").value = billNo;
+  } catch (err) {
+    console.error("Error fetching bill number:", err);
+    document.getElementById("bill-number").value = "BILL-ERROR";
+  }
+}
+
+function exportBill() {
+  const billNo = document.getElementById("bill-number").value;
+  const customer = document.getElementById("customer-name").value;
+  const phone = document.getElementById("customer-phone").value;
+  const total = document.getElementById("grand-total").innerText;
+  const tbody = document.getElementById("bill-table-body").innerHTML;
+
+  const win = window.open('', '', 'width=800,height=600');
+  win.document.write(`
+    <html><head><title>Bill</title></head><body>
+    <h2>Customer Bill</h2>
+    <p><strong>Bill No:</strong> ${billNo}<br>
+    <strong>Customer:</strong> ${customer}<br>
+    <strong>Phone:</strong> ${phone}</p>
+    <table border="1" style="width:100%;border-collapse:collapse;">
+      <thead><tr><th>ID</th><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+      <tbody>${tbody}</tbody>
+      <tfoot><tr><td colspan="4" style="text-align:right;"><strong>Total:</strong></td><td>${total}</td></tr></tfoot>
+    </table></body></html>`);
+  win.document.close();
+  win.print();
+}
+
+function shareOnWhatsApp() {
+  const phone = document.getElementById("customer-phone").value.replace(/\D/g, '');
+  const customer = document.getElementById("customer-name").value;
+  const billNo = document.getElementById("bill-number").value;
+  const total = document.getElementById("grand-total").innerText;
+  let msg = `🧾 *Bill No:* ${billNo}\n👤 *Customer:* ${customer}\n\n`;
+  billTableData.forEach(row => {
+    msg += `• ${row.item} - Qty: ${row.quantity}, ₹${row.total.toFixed(2)}\n`;
+  });
+  msg += `\n*Total: ${total}*`;
+  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+async function displayStock() {
+  const res = await fetch(API_URL + "?action=getStock");
+  stockData = await res.json();
+}
+
+window.onload = async () => {
+  await displayStock();
+  await refreshIDs();
+};
+
+async function displayStock() {
+  const res = await fetch(API_URL + "?action=getStock");
+  stockData = await res.json();
+  const tbody = document.getElementById("stock-table-body");
+  tbody.innerHTML = '';
+  stockData.forEach(row => {
+    tbody.innerHTML += `<tr>
+      <td>${row.id}</td>
+      <td>${row.item}</td>
+      <td>${row.quantity}</td>
+      <td>${row.price}</td>
+    </tr>`;
+  });
+}
+
+window.onload = async () => {
+  await displayStock();
+  await refreshIDs();
+  await generateBillNumber(); 
+};
+
+</script>
 </body>
 </html>
